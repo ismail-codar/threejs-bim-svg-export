@@ -1,5 +1,6 @@
 import * as THREE from "three";
 import { RasterToVectorSVGOptions, ExportResponse } from "./types";
+import { renderSceneToPNGBase64 } from "./render";
 
 const defaultOptions: RasterToVectorSVGOptions = {
   scaleFactor: 4,
@@ -192,100 +193,6 @@ function extractMaterialColor(
     color?: THREE.Color;
   };
   return anyMaterial?.color?.clone?.() ?? new THREE.Color(0xbdbdbd);
-}
-
-async function renderSceneToPNGBase64(
-  renderer: THREE.WebGLRenderer,
-  scene: THREE.Scene,
-  camera: THREE.Camera,
-  width: number,
-  height: number,
-  clearColor: number,
-): Promise<string> {
-  const target = new THREE.WebGLRenderTarget(width, height, {
-    depthBuffer: true,
-    stencilBuffer: false,
-    generateMipmaps: false,
-  });
-
-  const prevTarget = renderer.getRenderTarget();
-  const prevClear = renderer.getClearColor(new THREE.Color()).clone();
-  const prevAlpha = renderer.getClearAlpha();
-  const prevPixelRatio = renderer.getPixelRatio();
-  const prevSize = new THREE.Vector2();
-  renderer.getSize(prevSize);
-
-  renderer.setPixelRatio(1);
-  renderer.setSize(width, height, false);
-  renderer.setRenderTarget(target);
-  renderer.setClearColor(clearColor, 1);
-  renderer.clear(true, true, true);
-  renderer.render(scene, camera);
-
-  const buffer = new Uint8Array(width * height * 4);
-  renderer.readRenderTargetPixels(target, 0, 0, width, height, buffer);
-
-  renderer.setRenderTarget(prevTarget);
-  renderer.setClearColor(prevClear, prevAlpha);
-  renderer.setPixelRatio(prevPixelRatio);
-  renderer.setSize(prevSize.x, prevSize.y, false);
-  target.dispose();
-
-  const canvas = document.createElement("canvas");
-  canvas.width = width;
-  canvas.height = height;
-  const ctx = canvas.getContext("2d");
-  if (!ctx) throw new Error("2D canvas context unavailable");
-
-  const flipped = flipPixelsVertically(buffer, width, height);
-  const imageData = new ImageData(
-    new Uint8ClampedArray(flipped),
-    width,
-    height,
-  );
-  ctx.putImageData(imageData, 0, 0);
-
-  const blob = await new Promise<Blob>((resolve, reject) => {
-    canvas.toBlob((value) => {
-      if (!value) {
-        reject(new Error("Canvas PNG encoding failed"));
-        return;
-      }
-      resolve(value);
-    }, "image/png");
-  });
-
-  const dataUrl = await new Promise<string>((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onloadend = () => resolve(String(reader.result));
-    reader.onerror = () =>
-      reject(reader.error ?? new Error("FileReader failed"));
-    reader.readAsDataURL(blob);
-  });
-
-  // const pngPreview = document.createElement("img");
-  // pngPreview.src = dataUrl;
-  // document.body.appendChild(pngPreview);
-  //setTimeout(() => pngPreview.remove(), 5000);
-
-  return dataUrl.split(",")[1] ?? "";
-}
-
-function flipPixelsVertically(
-  pixels: Uint8Array,
-  width: number,
-  height: number,
-): Uint8Array {
-  const rowSize = width * 4;
-  const output = new Uint8Array(pixels.length);
-
-  for (let y = 0; y < height; y += 1) {
-    const srcStart = y * rowSize;
-    const dstStart = (height - y - 1) * rowSize;
-    output.set(pixels.subarray(srcStart, srcStart + rowSize), dstStart);
-  }
-
-  return output;
 }
 
 async function blobToBase64(blob: Blob): Promise<string> {

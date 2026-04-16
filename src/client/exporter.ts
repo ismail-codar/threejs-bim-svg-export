@@ -74,39 +74,30 @@ async function buildRasterPayload(
   const height = Math.max(1, Math.floor(viewport.y * options.scaleFactor));
 
   const edgeScene = buildEdgeScene(scene, options.edgeThresholdAngle);
-  const edgePNGBase64 = await renderSceneToPNGBase64(
-    renderer,
-    edgeScene,
-    camera,
+  const edgePNGBase64 = await renderSceneToPNGBase64(renderer, edgeScene, camera, {
     width,
     height,
-    0xffffff,
-  );
+    clearColor: 0xffffff,
+  });
 
   let fillPNGBase64: string | undefined;
   if (options.includeFills) {
     const fillScene = buildFlatFillScene(scene);
-    fillPNGBase64 = await renderSceneToPNGBase64(
-      renderer,
-      fillScene,
-      camera,
+    fillPNGBase64 = await renderSceneToPNGBase64(renderer, fillScene, camera, {
       width,
       height,
-      0xffffff,
-    );
+      clearColor: 0xffffff,
+    });
   }
 
   let shadingPNGBase64: string | undefined;
   if (options.includeShading) {
     const shadingScene = buildShadingScene(scene);
-    shadingPNGBase64 = await renderSceneToPNGBase64(
-      renderer,
-      shadingScene,
-      camera,
+    shadingPNGBase64 = await renderSceneToPNGBase64(renderer, shadingScene, camera, {
       width,
       height,
-      0xffffff,
-    );
+      clearColor: 0xffffff,
+    });
   }
 
   return {
@@ -193,16 +184,4 @@ function extractMaterialColor(
     color?: THREE.Color;
   };
   return anyMaterial?.color?.clone?.() ?? new THREE.Color(0xbdbdbd);
-}
-
-async function blobToBase64(blob: Blob): Promise<string> {
-  const dataUrl = await new Promise<string>((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onloadend = () => resolve(String(reader.result));
-    reader.onerror = () =>
-      reject(reader.error ?? new Error("FileReader failed"));
-    reader.readAsDataURL(blob);
-  });
-
-  return dataUrl.split(",")[1] ?? "";
 }
